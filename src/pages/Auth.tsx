@@ -58,29 +58,29 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await signUp(email, password, displayName);
-        
-        if (error) {
-          if (error.message.includes('already registered')) {
-            toast({
-              title: 'Account exists',
-              description: 'This email is already registered. Please sign in instead.',
-              variant: 'destructive',
-            });
+          const { error } = await signUp(email, password, displayName);
+          
+          if (error) {
+            if (error.message.includes('already registered')) {
+              toast({
+                title: 'Account exists',
+                description: 'This email is already registered. Please sign in instead.',
+                variant: 'destructive',
+              });
+            } else {
+              toast({
+                title: 'Sign up failed',
+                description: error.message,
+                variant: 'destructive',
+              });
+            }
           } else {
             toast({
-              title: 'Sign up failed',
-              description: error.message,
-              variant: 'destructive',
+              title: 'Welcome to Gokuldham!',
+              description: 'Your account has been created. If email confirmation is required, please check your inbox. Otherwise, you can now claim your flat!',
             });
+            // If email confirmation is not required, session will be set and useEffect will redirect
           }
-        } else {
-          toast({
-            title: 'Welcome to Gokuldham!',
-            description: 'Your account has been created. Now claim your flat!',
-          });
-          navigate('/');
-        }
       } else {
         const result = signInSchema.safeParse({ email, password });
         if (!result.success) {
