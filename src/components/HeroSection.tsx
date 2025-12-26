@@ -80,19 +80,19 @@ const HeroSection = () => {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Input 
-                  readOnly 
-                  value={`${window.location.origin}/auth?ref=${profile.referral_code}`} 
-                  className="bg-secondary/20 border-primary/10 font-mono text-xs"
-                />
-                <Button 
-                  variant="society" 
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/auth?ref=${profile.referral_code}`);
-                    toast({ title: "Link Copied!", description: "Share it with friends to get endorsements." });
-                  }}
-                >
+                  <Input 
+                    readOnly 
+                    value={`https://gokuldhamsociety.com/auth?ref=${profile.referral_code}`} 
+                    className="bg-secondary/20 border-primary/10 font-mono text-xs"
+                  />
+                  <Button 
+                    variant="society" 
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://gokuldhamsociety.com/auth?ref=${profile.referral_code}`);
+                      toast({ title: "Link Copied!", description: "Share it with friends to get endorsements." });
+                    }}
+                  >
                   Copy
                 </Button>
               </div>

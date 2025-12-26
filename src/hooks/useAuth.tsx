@@ -132,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user?.id]);
 
   const signUp = async (email: string, password: string, displayName: string, referredBy?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = "https://gokuldhamsociety.com/";
     
     let referredById = null;
     if (referredBy) {
