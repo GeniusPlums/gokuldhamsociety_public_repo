@@ -1,4 +1,4 @@
-import { Building2, Bell, Users, Vote, Menu, LogOut, Home, BookOpen } from "lucide-react";
+import { Building2, Bell, Users, Vote, Menu, LogOut, Home, BookOpen, Star } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
