@@ -1,10 +1,10 @@
-import React, { Suspense, useState, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment, Float, Text, ContactShadows, useCursor } from '@react-three/drei';
+import React, { Suspense, useState, useMemo, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Environment, Float, Text, ContactShadows, useCursor, Center, MapControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useFlats } from "@/hooks/useFlats";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, User, ShieldCheck, Zap, Heart, History, Info } from "lucide-react";
+import { Loader2, User, ShieldCheck, Zap, Heart, History, Info, Map as MapIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -14,106 +14,200 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 
-const Building = ({ position, wing, flats, onFlatClick, userFlatId }: { 
-  position: [number, number, number], 
-  wing: string, 
-  flats: any[], 
-  onFlatClick: (flat: any) => void,
-  userFlatId: string | undefined
-}) => {
+// Constants for proportions
+const FLOOR_HEIGHT = 2.5;
+const NUM_FLOORS = 5;
+const BUILDING_WIDTH = 8;
+const BUILDING_DEPTH = 6;
+const BALCONY_WIDTH = 2;
+const BALCONY_HEIGHT = 1.2;
+const BALCONY_DEPTH = 0.8;
+
+const Building = ({ position, rotation, wing, flats, onFlatClick, userFlatId, baseColor }: any) => {
+  const floors = Array.from({ length: NUM_FLOORS });
+  
+  // Group flats by floor (approximate based on flat number or index)
+  const flatsByFloor = useMemo(() => {
+    const grouped: any = {};
+    flats.forEach((flat: any, index: number) => {
+      // In Gokuldham, flat numbers usually indicate floor (e.g., 101, 102 are 1st floor)
+      const floorNum = Math.floor(parseInt(flat.flat_number) / 100) || (Math.floor(index / 2) + 1);
+      if (!grouped[floorNum]) grouped[floorNum] = [];
+      grouped[floorNum].push(flat);
+    });
+    return grouped;
+  }, [flats]);
+
   return (
-    <group position={position}>
-      {/* Building Base */}
-      <mesh position={[0, 4, 0]} castShadow receiveShadow>
-        <boxGeometry args={[4, 8, 4]} />
-        <meshStandardMaterial color="#f5f5dc" />
+    <group position={position} rotation={rotation}>
+      {/* Main Building Block */}
+      <mesh position={[0, (NUM_FLOORS * FLOOR_HEIGHT) / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[BUILDING_WIDTH, NUM_FLOORS * FLOOR_HEIGHT, BUILDING_DEPTH]} />
+        <meshStandardMaterial color={baseColor} roughness={0.8} />
       </mesh>
-      
+
+      {/* Floors Visual Separators */}
+      {floors.map((_, i) => (
+        <mesh key={i} position={[0, (i + 1) * FLOOR_HEIGHT, 0]} receiveShadow>
+          <boxGeometry args={[BUILDING_WIDTH + 0.2, 0.1, BUILDING_DEPTH + 0.2]} />
+          <meshStandardMaterial color="#4b5563" />
+        </mesh>
+      ))}
+
+      {/* Roof structure */}
+      <mesh position={[0, NUM_FLOORS * FLOOR_HEIGHT + 0.5, 0]} castShadow>
+        <boxGeometry args={[BUILDING_WIDTH + 0.5, 1, BUILDING_DEPTH + 0.5]} />
+        <meshStandardMaterial color="#374151" />
+      </mesh>
+
       {/* Wing Label */}
       <Text
-        position={[0, 9, 0]}
-        fontSize={1}
+        position={[0, NUM_FLOORS * FLOOR_HEIGHT + 2, 0]}
+        fontSize={1.5}
         color="#c2410c"
         anchorX="center"
         anchorY="middle"
       >
-        Wing {wing}
+        WING {wing}
       </Text>
 
-      {/* Flats on the building surface */}
-      {flats.map((flat, index) => {
-        const row = Math.floor(index / 2);
-        const col = index % 2;
-        const xPos = col === 0 ? -1.2 : 1.2;
-        const yPos = row * 2 + 1;
-        const isUserFlat = userFlatId === flat.id;
-        
-        return (
-          <FlatBox 
-            key={flat.id} 
-            position={[xPos, yPos, 2.1]} 
-            flat={flat} 
-            isUserFlat={isUserFlat}
-            onClick={() => onFlatClick(flat)}
-          />
-        );
+      {/* Balconies / Flats */}
+      {Object.entries(flatsByFloor).map(([floor, floorFlats]: [string, any]) => {
+        const floorIdx = parseInt(floor) - 1;
+        if (floorIdx >= NUM_FLOORS) return null;
+
+        return floorFlats.map((flat: any, idx: number) => {
+          // Position balconies side-by-side on the inward-facing side
+          const xPos = (idx - (floorFlats.length - 1) / 2) * (BALCONY_WIDTH + 0.5);
+          const yPos = floorIdx * FLOOR_HEIGHT + FLOOR_HEIGHT / 2;
+          const zPos = BUILDING_DEPTH / 2 + BALCONY_DEPTH / 2;
+          const isUserFlat = userFlatId === flat.id;
+
+          return (
+            <Balcony 
+              key={flat.id}
+              position={[xPos, yPos, zPos]}
+              flat={flat}
+              isUserFlat={isUserFlat}
+              onClick={() => onFlatClick(flat)}
+            />
+          );
+        });
       })}
     </group>
   );
 };
 
-const FlatBox = ({ position, flat, onClick, isUserFlat }: { 
-  position: [number, number, number], 
-  flat: any, 
-  onClick: () => void,
-  isUserFlat: boolean
-}) => {
+const Balcony = ({ position, flat, onClick, isUserFlat }: any) => {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
 
   const color = useMemo(() => {
-    if (isUserFlat) return "#f97316"; // Primary Orange
-    if (flat.is_claimed) return "#0d9488"; // Teal
-    return "#94a3b8"; // Muted Slate
+    if (isUserFlat) return "#f97316"; // Your flat
+    if (flat.is_claimed) return "#0d9488"; // Occupied
+    return "#94a3b8"; // Available
   }, [flat.is_claimed, isUserFlat]);
 
   return (
-    <mesh 
-      position={position} 
+    <group 
+      position={position}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
-      castShadow
     >
-      <boxGeometry args={[1.5, 1.2, 0.5]} />
-      <meshStandardMaterial 
-        color={color} 
-        emissive={hovered ? color : "black"} 
-        emissiveIntensity={hovered ? 0.5 : 0}
-      />
+      {/* Balcony Base */}
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[BALCONY_WIDTH, 0.2, BALCONY_DEPTH]} />
+        <meshStandardMaterial color="#e5e7eb" />
+      </mesh>
+
+      {/* Railings */}
+      <mesh position={[0, BALCONY_HEIGHT / 2, BALCONY_DEPTH / 2]} castShadow>
+        <boxGeometry args={[BALCONY_WIDTH, BALCONY_HEIGHT, 0.05]} />
+        <meshStandardMaterial color="#4b5563" opacity={0.6} transparent />
+      </mesh>
+      
+      {/* Flat Door Area (Clickable part) */}
+      <mesh position={[0, BALCONY_HEIGHT / 2, -BALCONY_DEPTH / 4]} castShadow>
+        <boxGeometry args={[BALCONY_WIDTH - 0.2, BALCONY_HEIGHT, 0.1]} />
+        <meshStandardMaterial 
+          color={color} 
+          emissive={hovered ? color : "black"} 
+          emissiveIntensity={hovered ? 0.5 : 0}
+        />
+      </mesh>
+
+      {/* Flat Number */}
       <Text
-        position={[0, 0, 0.26]}
-        fontSize={0.3}
+        position={[0, BALCONY_HEIGHT / 2, 0.1]}
+        fontSize={0.4}
         color="white"
         anchorX="center"
         anchorY="middle"
       >
         {flat.flat_number}
       </Text>
-    </mesh>
+
+      {/* Identity Indicator */}
+      {flat.is_claimed && (
+        <mesh position={[0, BALCONY_HEIGHT + 0.3, 0]}>
+          <sphereGeometry args={[0.15, 16, 16]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
+        </mesh>
+      )}
+    </group>
   );
 };
 
-const NoticeBoard3D = ({ onClick }: { onClick: () => void }) => {
+const MainGate = () => (
+  <group position={[0, 0, 18]}>
+    {/* Pillars */}
+    <mesh position={[-4, 2, 0]} castShadow>
+      <boxGeometry args={[1, 4, 1]} />
+      <meshStandardMaterial color="#d1d5db" />
+    </mesh>
+    <mesh position={[4, 2, 0]} castShadow>
+      <boxGeometry args={[1, 4, 1]} />
+      <meshStandardMaterial color="#d1d5db" />
+    </mesh>
+    
+    {/* Arch */}
+    <mesh position={[0, 4.2, 0]} castShadow>
+      <boxGeometry args={[9, 0.5, 1]} />
+      <meshStandardMaterial color="#c2410c" />
+    </mesh>
+    <Text
+      position={[0, 4.2, 0.51]}
+      fontSize={0.4}
+      color="white"
+      anchorX="center"
+      anchorY="middle"
+    >
+      GOKULDHAM SOCIETY
+    </Text>
+
+    {/* Watchman Cabin */}
+    <mesh position={[-6, 1.5, -1]} castShadow>
+      <boxGeometry args={[2, 3, 2]} />
+      <meshStandardMaterial color="#fef3c7" />
+    </mesh>
+    <mesh position={[-6, 3, -1]} castShadow>
+      <boxGeometry args={[2.5, 0.2, 2.5]} />
+      <meshStandardMaterial color="#92400e" />
+    </mesh>
+  </group>
+);
+
+const NoticeBoard3D = ({ onClick }: any) => {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
 
   return (
     <group 
-      position={[0, 1, 6]} 
+      position={[0, 0, 8]} 
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -121,28 +215,106 @@ const NoticeBoard3D = ({ onClick }: { onClick: () => void }) => {
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <mesh castShadow>
-        <boxGeometry args={[3, 2, 0.2]} />
-        <meshStandardMaterial color="#fbbf24" />
-      </mesh>
-      <mesh position={[0, -1, 0]}>
-        <boxGeometry args={[0.2, 2, 0.2]} />
+      {/* Stand */}
+      <mesh position={[-1, 1, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 2]} />
         <meshStandardMaterial color="#4b5563" />
       </mesh>
+      <mesh position={[1, 1, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 2]} />
+        <meshStandardMaterial color="#4b5563" />
+      </mesh>
+      
+      {/* Board */}
+      <mesh position={[0, 2.5, 0]} castShadow>
+        <boxGeometry args={[4, 2.5, 0.2]} />
+        <meshStandardMaterial color="#fbbf24" roughness={0.5} />
+      </mesh>
+      
+      {/* Frame */}
+      <mesh position={[0, 2.5, 0]}>
+        <boxGeometry args={[4.2, 2.7, 0.1]} />
+        <meshStandardMaterial color="#92400e" />
+      </mesh>
+
       <Text
-        position={[0, 0, 0.11]}
+        position={[0, 2.8, 0.11]}
         fontSize={0.3}
         color="#1f2937"
         anchorX="center"
         anchorY="middle"
+        maxWidth={3}
       >
         SOCIETY NOTICES
       </Text>
+      <Text
+        position={[0, 2.2, 0.11]}
+        fontSize={0.15}
+        color="#4b5563"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={3}
+      >
+        Click to view latest drama & updates
+      </Text>
+
       {hovered && (
-        <Float speed={5} rotationIntensity={0.5} floatIntensity={0.5}>
-          <mesh position={[0, 1.5, 0]}>
-            <sphereGeometry args={[0.2, 16, 16]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1} />
+        <mesh position={[0, 4, 0]}>
+          <sphereGeometry args={[0.2, 16, 16]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={1} />
+        </mesh>
+      )}
+    </group>
+  );
+};
+
+const MeetingHall3D = ({ onClick }: any) => {
+  const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
+
+  return (
+    <group 
+      position={[10, 0, -10]} 
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+    >
+      {/* Building */}
+      <mesh position={[0, 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[6, 4, 6]} />
+        <meshStandardMaterial color="#0d9488" roughness={0.7} />
+      </mesh>
+      
+      {/* Roof */}
+      <mesh position={[0, 4.1, 0]}>
+        <boxGeometry args={[6.5, 0.2, 6.5]} />
+        <meshStandardMaterial color="#134e4a" />
+      </mesh>
+
+      {/* Windows */}
+      <mesh position={[0, 2.5, 3.01]}>
+        <planeGeometry args={[4, 1.5]} />
+        <meshStandardMaterial color="#99f6e4" opacity={0.6} transparent />
+      </mesh>
+
+      <Text
+        position={[0, 4.5, 0]}
+        fontSize={0.6}
+        color="white"
+        anchorX="center"
+        anchorY="middle"
+      >
+        SOCIETY OFFICE
+      </Text>
+      
+      {hovered && (
+        <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
+          <mesh position={[0, 5.5, 0]}>
+            <coneGeometry args={[0.3, 0.6, 4]} />
+            <meshStandardMaterial color="#0d9488" emissive="#0d9488" emissiveIntensity={1} />
           </mesh>
         </Float>
       )}
@@ -150,36 +322,25 @@ const NoticeBoard3D = ({ onClick }: { onClick: () => void }) => {
   );
 };
 
-const MeetingHall3D = ({ onClick }: { onClick: () => void }) => {
-  const [hovered, setHovered] = useState(false);
-  useCursor(hovered);
-
-  return (
-    <group 
-      position={[6, 1, 0]} 
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
-    >
-      <mesh castShadow>
-        <cylinderGeometry args={[3, 3, 2, 6]} />
-        <meshStandardMaterial color="#0d9488" opacity={0.8} transparent />
-      </mesh>
-      <Text
-        position={[0, 1.5, 0]}
-        fontSize={0.4}
-        color="white"
-        anchorX="center"
-        anchorY="middle"
-      >
-        MEETING HALL
-      </Text>
-    </group>
-  );
-};
+const Trees = () => (
+  <group>
+    {[
+      [-12, 0, 12], [12, 0, 12], [-12, 0, -12], [12, 0, -12],
+      [-18, 0, 0], [18, 0, 0], [0, 0, -20]
+    ].map((pos, i) => (
+      <group key={i} position={pos as [number, number, number]}>
+        <mesh position={[0, 1, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.3, 2]} />
+          <meshStandardMaterial color="#92400e" />
+        </mesh>
+        <mesh position={[0, 3, 0]} castShadow>
+          <sphereGeometry args={[1.5, 8, 8]} />
+          <meshStandardMaterial color="#166534" />
+        </mesh>
+      </group>
+    ))}
+  </group>
+);
 
 const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHallClick }: any) => {
   const buildings = useMemo(() => {
@@ -192,55 +353,72 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
 
   return (
     <>
-      <PerspectiveCamera makeDefault position={[15, 15, 15]} fov={50} />
-      <OrbitControls 
+      <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={40} />
+      <MapControls 
         enablePan={true} 
-        maxPolarAngle={Math.PI / 2.1} 
-        minDistance={10} 
-        maxDistance={40} 
-        autoRotate={false}
+        maxPolarAngle={Math.PI / 2.5} 
+        minDistance={20} 
+        maxDistance={60}
       />
       
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={1} castShadow />
-      <directionalLight position={[-10, 20, 10]} intensity={1.5} castShadow />
+      <ambientLight intensity={0.7} />
+      <directionalLight 
+        position={[10, 20, 10]} 
+        intensity={1.5} 
+        castShadow 
+        shadow-mapSize={[2048, 2048]}
+      />
+      <pointLight position={[-10, 10, -10]} intensity={0.5} />
 
-      {/* Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
+      {/* Ground / Courtyard */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#fdfbf7" />
+        <meshStandardMaterial color="#e5e7eb" roughness={1} />
       </mesh>
-      <gridHelper args={[100, 50, "#e5e7eb", "#f3f4f6"]} position={[0, 0, 0]} />
+      
+      {/* Central Area Pavement */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <circleGeometry args={[15, 32]} />
+        <meshStandardMaterial color="#d1d5db" />
+      </mesh>
 
-      {/* Buildings */}
+      {/* Buildings Arrangement */}
       <Building 
-        position={[-8, 0, -8]} 
+        position={[-18, 0, 0]} 
+        rotation={[0, Math.PI / 2, 0]}
         wing="A" 
         flats={buildings["A"] || []} 
         onFlatClick={onFlatClick} 
         userFlatId={userFlatId}
+        baseColor="#fef3c7"
       />
       <Building 
-        position={[0, 0, -12]} 
+        position={[0, 0, -18]} 
+        rotation={[0, 0, 0]}
         wing="B" 
         flats={buildings["B"] || []} 
         onFlatClick={onFlatClick} 
         userFlatId={userFlatId}
+        baseColor="#ecfdf5"
       />
       <Building 
-        position={[8, 0, -8]} 
+        position={[18, 0, 0]} 
+        rotation={[0, -Math.PI / 2, 0]}
         wing="C" 
         flats={buildings["C"] || []} 
         onFlatClick={onFlatClick} 
         userFlatId={userFlatId}
+        baseColor="#fff7ed"
       />
 
-      {/* Common Areas */}
+      {/* Environment & Landmarks */}
+      <MainGate />
       <NoticeBoard3D onClick={onNoticeBoardClick} />
       <MeetingHall3D onClick={onMeetingHallClick} />
+      <Trees />
 
-      <ContactShadows position={[0, 0, 0]} opacity={0.4} scale={40} blur={2} far={4.5} />
-      <Environment preset="city" />
+      <ContactShadows position={[0, 0, 0]} opacity={0.3} scale={60} blur={2.5} far={10} />
+      <Environment preset="sunset" />
     </>
   );
 };
@@ -266,30 +444,50 @@ const ThreeSocietyMap = () => {
 
   if (loading) {
     return (
-      <div className="h-[600px] flex items-center justify-center bg-society-cream/50 rounded-3xl border border-border">
+      <div className="h-[700px] flex items-center justify-center bg-society-cream/50 rounded-3xl border border-border">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <section className="py-16 bg-society-cream/50" id="map">
+    <section className="py-20 bg-society-cream/50" id="map">
       <div className="container">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold mb-4 uppercase tracking-widest">
-            3D Living Society
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary/10 text-primary rounded-full text-xs font-black mb-4 uppercase tracking-[0.2em]">
+              <MapIcon className="w-3.5 h-3.5" />
+              Live 3D Society
+            </div>
+            <h2 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
+              Explore Gokuldham
+            </h2>
+            <p className="text-muted-foreground text-lg">
+              Click on balconies to view residents, visit the notice board for drama, 
+              or head to the office for meetings. This is your digital home.
+            </p>
           </div>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Interactive Society Map
-          </h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Welcome to the 3D world of Gokuldham. Click on buildings to view flats, 
-            or visit the central notice board and meeting hall.
-          </p>
+          
+          <div className="flex items-center gap-4 p-4 bg-background/50 backdrop-blur-sm rounded-2xl border border-border shadow-sm">
+            <div className="flex items-center gap-6 px-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#0d9488]" />
+                <span className="text-xs font-bold text-muted-foreground">Occupied</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#94a3b8]" />
+                <span className="text-xs font-bold text-muted-foreground">Available</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#f97316]" />
+                <span className="text-xs font-bold text-muted-foreground">Yours</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="h-[600px] w-full bg-card rounded-3xl border border-border shadow-elevated overflow-hidden relative group">
-          <Canvas shadows>
+        <div className="h-[700px] w-full bg-[#111] rounded-[2.5rem] border-8 border-background shadow-2xl overflow-hidden relative group cursor-grab active:cursor-grabbing">
+          <Canvas shadows dpr={[1, 2]}>
             <Suspense fallback={null}>
               <Scene 
                 flats={flats} 
@@ -301,108 +499,129 @@ const ThreeSocietyMap = () => {
             </Suspense>
           </Canvas>
           
-          <div className="absolute bottom-6 right-6 p-4 bg-background/80 backdrop-blur-md rounded-2xl border border-border shadow-card pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-            <p className="text-xs font-bold uppercase tracking-wider mb-2">Controls</p>
-            <ul className="text-[10px] space-y-1 text-muted-foreground">
-              <li>• Left Click: Rotate</li>
-              <li>• Right Click: Pan</li>
-              <li>• Scroll: Zoom</li>
-              <li>• Click Objects to interact</li>
-            </ul>
+          {/* HUD Overlay */}
+          <div className="absolute top-8 left-8 flex flex-col gap-4 pointer-events-none">
+            <div className="px-6 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 text-white shadow-2xl">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Current Zone</p>
+              <p className="text-lg font-display font-bold">Main Courtyard</p>
+            </div>
           </div>
-        </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center justify-center gap-8 mt-12 p-6 bg-card/50 rounded-2xl border border-border/50 max-w-2xl mx-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded-lg bg-[#0d9488]" />
-            <span className="text-sm font-medium text-muted-foreground">Occupied</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded-lg bg-[#94a3b8]" />
-            <span className="text-sm font-medium text-muted-foreground">Available</span>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-5 h-5 rounded-lg bg-[#f97316]" />
-            <span className="text-sm font-medium text-muted-foreground">Your Flat</span>
+          <div className="absolute bottom-8 right-8 p-6 bg-black/40 backdrop-blur-xl rounded-[2rem] border border-white/10 text-white shadow-2xl transition-all duration-500 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-4">Navigation Guide</p>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">LMB</div>
+                <span className="text-xs font-medium opacity-80">Rotate View</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">RMB</div>
+                <span className="text-xs font-medium opacity-80">Pan Society</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">SCR</div>
+                <span className="text-xs font-medium opacity-80">Zoom In/Out</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">CLK</div>
+                <span className="text-xs font-medium opacity-80">Interact</span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Flat Details Dialog */}
         <Dialog open={!!selectedFlat} onOpenChange={(open) => !open && setSelectedFlat(null)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md bg-society-cream border-primary/20">
             {selectedFlat && (
               <>
                 <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2 text-2xl">
-                    <span className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground text-sm">
+                  <DialogTitle className="flex items-center gap-4 text-3xl font-display">
+                    <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground text-xl font-black shadow-lg rotate-3">
                       {selectedFlat.building}-{selectedFlat.flat_number}
-                    </span>
-                    Flat Details
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm uppercase tracking-widest text-primary font-black">Residence Details</span>
+                      <span className="text-foreground">Wing {selectedFlat.building}</span>
+                    </div>
                   </DialogTitle>
                 </DialogHeader>
-                <div className="space-y-6 pt-4">
-                  <div className="flex items-center justify-between p-4 bg-muted rounded-2xl border border-border">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <User className="w-6 h-6" />
+                <div className="space-y-6 pt-6">
+                  <div className="relative group overflow-hidden rounded-[2rem] bg-card border-2 border-border p-6 transition-all hover:border-primary/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary ring-4 ring-primary/5">
+                          <User className="w-8 h-8" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Resident Owner</p>
+                          <p className="font-display text-2xl font-bold text-foreground">
+                            {selectedFlat.owner?.display_name || 'Available Flat'}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Owner</p>
-                        <p className="font-bold text-lg">{selectedFlat.owner?.display_name || 'Unclaimed'}</p>
-                      </div>
+                      {!selectedFlat.is_claimed && (
+                        <Button 
+                          variant="society" 
+                          size="lg" 
+                          onClick={() => handleClaimFlat(selectedFlat.id)} 
+                          disabled={!!userFlat}
+                          className="shadow-xl shadow-primary/20"
+                        >
+                          {claimingFlat === selectedFlat.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "Claim Residence"}
+                        </Button>
+                      )}
                     </div>
-                    {!selectedFlat.is_claimed && (
-                      <Button variant="society" size="sm" onClick={() => handleClaimFlat(selectedFlat.id)} disabled={!!userFlat}>
-                        {claimingFlat === selectedFlat.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Claim Flat"}
-                      </Button>
-                    )}
                   </div>
 
                   {selectedFlat.is_claimed && (
                     <>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="p-3 rounded-2xl bg-secondary/5 border border-secondary/10 text-center">
-                          <ShieldCheck className="w-5 h-5 text-secondary mx-auto mb-1" />
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold">Trust</p>
-                          <p className="text-lg font-black text-secondary">{selectedFlat.trust_score}</p>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-4 rounded-[1.5rem] bg-secondary/10 border-2 border-secondary/20 text-center transition-transform hover:scale-105">
+                          <ShieldCheck className="w-6 h-6 text-secondary mx-auto mb-2" />
+                          <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Trust</p>
+                          <p className="text-2xl font-black text-secondary">{selectedFlat.trust_score}</p>
                         </div>
-                        <div className="p-3 rounded-2xl bg-destructive/5 border border-destructive/10 text-center">
-                          <Zap className="w-5 h-5 text-destructive mx-auto mb-1" />
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold">Chaos</p>
-                          <p className="text-lg font-black text-destructive">{selectedFlat.chaos_score}</p>
+                        <div className="p-4 rounded-[1.5rem] bg-destructive/10 border-2 border-destructive/20 text-center transition-transform hover:scale-105">
+                          <Zap className="w-6 h-6 text-destructive mx-auto mb-2" />
+                          <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Chaos</p>
+                          <p className="text-2xl font-black text-destructive">{selectedFlat.chaos_score}</p>
                         </div>
-                        <div className="p-3 rounded-2xl bg-accent/10 border border-accent/20 text-center">
-                          <Heart className="w-5 h-5 text-accent-foreground mx-auto mb-1" />
-                          <p className="text-[10px] text-muted-foreground uppercase font-bold">Contrib</p>
-                          <p className="text-lg font-black text-accent-foreground">{selectedFlat.contribution_score}</p>
+                        <div className="p-4 rounded-[1.5rem] bg-accent/20 border-2 border-accent/30 text-center transition-transform hover:scale-105">
+                          <Heart className="w-6 h-6 text-accent-foreground mx-auto mb-2" />
+                          <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">Contrib</p>
+                          <p className="text-2xl font-black text-accent-foreground">{selectedFlat.contribution_score}</p>
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <h4 className="flex items-center gap-2 text-sm font-bold text-foreground">
+                      <div className="space-y-4">
+                        <h4 className="flex items-center gap-2 text-sm font-black text-foreground uppercase tracking-widest">
                           <History className="w-4 h-4 text-primary" />
-                          Reputation Summary
+                          Society Standing
                         </h4>
-                        <div className="p-4 bg-muted/30 rounded-2xl border border-border/50 text-xs text-muted-foreground leading-relaxed">
-                          {selectedFlat.trust_score > 60 ? (
-                            "A highly respected resident of the society. Their word carries weight in polls."
+                        <div className="p-6 bg-white rounded-[2rem] border-2 border-dashed border-border text-sm text-muted-foreground leading-relaxed italic">
+                          "{selectedFlat.trust_score > 60 ? (
+                            "A pillar of the Gokuldham community. Their contributions and behavior set a high standard for all residents."
                           ) : selectedFlat.chaos_score > 20 ? (
-                            "Known for stirring up some society drama! Often involved in complaints."
+                            "A colorful character who keeps the society meetings lively (and long). Often at the center of the latest dispute."
                           ) : (
-                            "A quiet resident contributing to the society's growth."
-                          )}
+                            "A respected member of the society family, currently building their reputation through active participation."
+                          )}"
                         </div>
                       </div>
                     </>
                   )}
 
                   {!selectedFlat.is_claimed && (
-                    <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                      <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        This flat is currently empty. If you're a new member of Gokuldham, you can claim it as your own!
-                      </p>
+                    <div className="flex items-start gap-4 p-6 bg-primary/10 rounded-[2rem] border-2 border-primary/20">
+                      <Info className="w-6 h-6 text-primary shrink-0 mt-1" />
+                      <div>
+                        <p className="text-sm font-bold text-primary mb-1 uppercase tracking-wider">Empty Residence</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          This flat is currently awaiting a new family. Claiming it will give you full voting rights 
+                          and the ability to participate in society drama!
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
