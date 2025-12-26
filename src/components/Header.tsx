@@ -1,4 +1,4 @@
-import { Building2, Bell, Users, Vote, Menu, LogOut, Home } from "lucide-react";
+import { Building2, Bell, Users, Vote, Menu, LogOut, Home, BookOpen } from "lucide-react";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -52,20 +52,24 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
-          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('notices')}>
-            <Bell className="w-4 h-4" />
-            Notices
-          </Button>
-          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('map')}>
-            <Users className="w-4 h-4" />
-            Residents
-          </Button>
-          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('polls')}>
-            <Vote className="w-4 h-4" />
-            Polls
-          </Button>
-        </nav>
+          <nav className="hidden md:flex items-center gap-1">
+            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('wiki')}>
+              <BookOpen className="w-4 h-4" />
+              Wiki
+            </Button>
+            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('notices')}>
+              <Bell className="w-4 h-4" />
+              Notices
+            </Button>
+            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('map')}>
+              <Users className="w-4 h-4" />
+              Residents
+            </Button>
+            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('polls')}>
+              <Vote className="w-4 h-4" />
+              Polls
+            </Button>
+          </nav>
 
         <div className="hidden md:flex items-center gap-3">
           {user ? (

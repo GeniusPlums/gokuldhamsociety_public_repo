@@ -2,6 +2,7 @@ import { Helmet } from "react-helmet-async";
 import Header from "@/components/Header";
 import HeroSection from "@/components/HeroSection";
 import ThreeSocietyMap from "@/components/ThreeSocietyMap";
+import { WikiSections } from "@/components/WikiSections";
 import NoticeBoard from "@/components/NoticeBoard";
 import ActivePoll from "@/components/ActivePoll";
 import ElectionBanner from "@/components/ElectionBanner";
@@ -27,6 +28,7 @@ const Index = () => {
             <div id="hero"><HeroSection /></div>
             <div id="elections"><ElectionBanner /></div>
             <div id="map"><ThreeSocietyMap /></div>
+            <div id="wiki"><WikiSections /></div>
             <div id="notices"><NoticeBoard /></div>
             <div id="polls"><ActivePoll /></div>
             <div id="complaints"><ComplaintHighlights /></div>
