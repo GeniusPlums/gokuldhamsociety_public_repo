@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useMemo, useRef } from 'react';
+import React, { Suspense, useState, useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, Float, Text, ContactShadows, useCursor, Center, MapControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -322,19 +322,19 @@ const MeetingHall3D = ({ onClick, position, label }: any) => {
   );
 };
 
-const Trees = () => (
+const Trees = ({ isLowEnd }: { isLowEnd: boolean }) => (
   <group>
     {[
       [-12, 0, 12], [12, 0, 12], [-12, 0, -12], [12, 0, -12],
       [-18, 0, 0], [24, 0, 0], [0, 0, -28]
     ].map((pos, i) => (
       <group key={i} position={pos as [number, number, number]}>
-        <mesh position={[0, 1, 0]} castShadow>
-          <cylinderGeometry args={[0.2, 0.3, 2]} />
+        <mesh position={[0, 1, 0]} castShadow={!isLowEnd}>
+          <cylinderGeometry args={[0.2, 0.3, 2, isLowEnd ? 4 : 8]} />
           <meshStandardMaterial color="#92400e" />
         </mesh>
-        <mesh position={[0, 3, 0]} castShadow>
-          <sphereGeometry args={[1.5, 8, 8]} />
+        <mesh position={[0, 3, 0]} castShadow={!isLowEnd}>
+          <sphereGeometry args={[1.5, isLowEnd ? 4 : 8, isLowEnd ? 4 : 8]} />
           <meshStandardMaterial color="#166534" />
         </mesh>
       </group>
@@ -342,7 +342,7 @@ const Trees = () => (
   </group>
 );
 
-const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHallClick }: any) => {
+const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHallClick, isLowEnd }: any) => {
   const buildings = useMemo(() => {
     return flats.reduce((acc: any, flat: any) => {
       if (!acc[flat.building]) acc[flat.building] = [];
@@ -363,24 +363,24 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         rotateSpeed={0.5}
       />
       
-      <ambientLight intensity={0.7} />
+      <ambientLight intensity={isLowEnd ? 0.8 : 0.7} />
       <directionalLight 
         position={[10, 20, 10]} 
         intensity={1.5} 
-        castShadow 
-        shadow-mapSize={[2048, 2048]}
+        castShadow={!isLowEnd}
+        shadow-mapSize={isLowEnd ? [256, 256] : [1024, 1024]}
       />
-      <pointLight position={[-10, 10, -10]} intensity={0.5} />
+      {!isLowEnd && <pointLight position={[-10, 10, -10]} intensity={0.5} />}
 
       {/* Ground / Courtyard */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow={!isLowEnd}>
         <planeGeometry args={[150, 150]} />
         <meshStandardMaterial color="#e5e7eb" roughness={1} />
       </mesh>
       
       {/* Central Area Pavement */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <circleGeometry args={[15, 32]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow={!isLowEnd}>
+        <circleGeometry args={[15, isLowEnd ? 16 : 32]} />
         <meshStandardMaterial color="#d1d5db" />
       </mesh>
 
@@ -426,7 +426,7 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
       />
 
       {/* Environment & Landmarks */}
-      <MainGate position={[0, 0, 20]} />
+      <MainGate />
       <NoticeBoard3D onClick={onNoticeBoardClick} />
       <MeetingHall3D 
         position={[18, 0, 10]} 
@@ -438,9 +438,9 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         label="CLUB HOUSE" 
         onClick={() => {}} 
       />
-      <Trees />
+      <Trees isLowEnd={isLowEnd} />
 
-      <ContactShadows position={[0, 0, 0]} opacity={0.3} scale={60} blur={2.5} far={10} />
+      {!isLowEnd && <ContactShadows position={[0, 0, 0]} opacity={0.3} scale={60} blur={2.5} far={10} />}
       <Environment preset="sunset" />
     </>
   );
@@ -448,7 +448,7 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
 
 const ThreeSocietyMap = () => {
   const { flats, loading, claimFlat } = useFlats();
-  const { user, flat: userFlat } = useAuth();
+  const { user, flat: userFlat, profile } = useAuth();
   const [selectedFlat, setSelectedFlat] = useState<any | null>(null);
   const [claimingFlat, setClaimingFlat] = useState<string | null>(null);
   const [isLowEnd, setIsLowEnd] = useState(() => localStorage.getItem("lowEndMode") === "true");
@@ -517,17 +517,18 @@ const ThreeSocietyMap = () => {
         </div>
 
         <div className="h-[700px] w-full bg-[#111] rounded-[2.5rem] border-8 border-background shadow-2xl overflow-hidden relative group cursor-grab active:cursor-grabbing">
-          <Canvas shadows dpr={[1, 2]}>
-            <Suspense fallback={null}>
-              <Scene 
-                flats={flats} 
-                onFlatClick={setSelectedFlat} 
-                userFlatId={userFlat?.id}
-                onNoticeBoardClick={() => document.getElementById('notices')?.scrollIntoView({ behavior: 'smooth' })}
-                onMeetingHallClick={() => document.getElementById('polls')?.scrollIntoView({ behavior: 'smooth' })}
-              />
-            </Suspense>
-          </Canvas>
+            <Canvas shadows dpr={isLowEnd ? 1 : [1, 2]}>
+              <Suspense fallback={null}>
+                <Scene 
+                  flats={flats} 
+                  onFlatClick={setSelectedFlat} 
+                  userFlatId={userFlat?.id}
+                  onNoticeBoardClick={() => document.getElementById('notices')?.scrollIntoView({ behavior: 'smooth' })}
+                  onMeetingHallClick={() => document.getElementById('polls')?.scrollIntoView({ behavior: 'smooth' })}
+                  isLowEnd={isLowEnd}
+                />
+              </Suspense>
+            </Canvas>
           
           {/* HUD Overlay */}
           <div className="absolute top-8 left-8 flex flex-col gap-4 pointer-events-none">
