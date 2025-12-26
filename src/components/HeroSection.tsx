@@ -1,11 +1,14 @@
-import { ArrowRight, Home, Users, MessageSquare } from "lucide-react";
+import { ArrowRight, Home, Users, MessageSquare, Share2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { Input } from "./ui/input";
+import { useToast } from "@/hooks/use-toast";
 
 const HeroSection = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
@@ -65,8 +68,43 @@ const HeroSection = () => {
             </Button>
           </div>
 
+          {profile && (
+            <div className="mb-12 p-6 bg-card/80 backdrop-blur-md rounded-3xl border-2 border-primary/20 shadow-xl max-w-xl mx-auto animate-slide-up stagger-4 opacity-0">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Share2 className="w-6 h-6" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-display font-bold text-lg">Invite Friends & Get Flats</h3>
+                  <p className="text-sm text-muted-foreground">Share your referral link to earn endorsements</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Input 
+                  readOnly 
+                  value={`${window.location.origin}/auth?ref=${profile.referral_code}`} 
+                  className="bg-secondary/20 border-primary/10 font-mono text-xs"
+                />
+                <Button 
+                  variant="society" 
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/auth?ref=${profile.referral_code}`);
+                    toast({ title: "Link Copied!", description: "Share it with friends to get endorsements." });
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+              <div className="mt-4 flex items-center justify-between text-xs font-bold text-muted-foreground">
+                <span>Your Endorsements: <span className="text-primary">{profile.endorsement_count}</span></span>
+                <button onClick={() => scrollToSection('map')} className="text-primary hover:underline">View Progress →</button>
+              </div>
+            </div>
+          )}
+
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-md mx-auto animate-slide-up stagger-4 opacity-0">
+          <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-md mx-auto animate-slide-up stagger-5 opacity-0">
             <div className="text-center">
               <div className="flex items-center justify-center w-12 h-12 mx-auto mb-2 rounded-xl bg-primary/10 text-primary">
                 <Home className="w-6 h-6" />

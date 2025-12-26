@@ -354,11 +354,13 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
   return (
     <>
       <PerspectiveCamera makeDefault position={[30, 30, 30]} fov={40} />
-      <MapControls 
+      <OrbitControls 
         enablePan={true} 
-        maxPolarAngle={Math.PI / 2.5} 
+        maxPolarAngle={Math.PI / 2.1} 
+        minPolarAngle={Math.PI / 6}
         minDistance={20} 
-        maxDistance={60}
+        maxDistance={80}
+        rotateSpeed={0.5}
       />
       
       <ambientLight intensity={0.7} />
@@ -372,7 +374,7 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
 
       {/* Ground / Courtyard */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[100, 100]} />
+        <planeGeometry args={[150, 150]} />
         <meshStandardMaterial color="#e5e7eb" roughness={1} />
       </mesh>
       
@@ -382,9 +384,10 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         <meshStandardMaterial color="#d1d5db" />
       </mesh>
 
-      {/* Buildings Arrangement */}
+      {/* Buildings Arrangement - Rectangular Layout */}
+      {/* Left Side */}
       <Building 
-        position={[-18, 0, 0]} 
+        position={[-18, 0, -10]} 
         rotation={[0, Math.PI / 2, 0]}
         wing="A" 
         flats={buildings["A"] || []} 
@@ -393,17 +396,8 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         baseColor="#fef3c7"
       />
       <Building 
-        position={[0, 0, -18]} 
-        rotation={[0, 0, 0]}
-        wing="B" 
-        flats={buildings["B"] || []} 
-        onFlatClick={onFlatClick} 
-        userFlatId={userFlatId}
-        baseColor="#ecfdf5"
-      />
-      <Building 
-        position={[18, 0, 0]} 
-        rotation={[0, -Math.PI / 2, 0]}
+        position={[-18, 0, 10]} 
+        rotation={[0, Math.PI / 2, 0]}
         wing="C" 
         flats={buildings["C"] || []} 
         onFlatClick={onFlatClick} 
@@ -411,8 +405,28 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         baseColor="#fff7ed"
       />
 
+      {/* Right Side */}
+      <Building 
+        position={[18, 0, -10]} 
+        rotation={[0, -Math.PI / 2, 0]}
+        wing="D" 
+        flats={buildings["D"] || []} 
+        onFlatClick={onFlatClick} 
+        userFlatId={userFlatId}
+        baseColor="#f3f4f6"
+      />
+      <Building 
+        position={[18, 0, 10]} 
+        rotation={[0, -Math.PI / 2, 0]}
+        wing="B" 
+        flats={buildings["B"] || []} 
+        onFlatClick={onFlatClick} 
+        userFlatId={userFlatId}
+        baseColor="#ecfdf5"
+      />
+
       {/* Environment & Landmarks */}
-      <MainGate />
+      <MainGate position={[0, 0, 20]} />
       <NoticeBoard3D onClick={onNoticeBoardClick} />
       <MeetingHall3D onClick={onMeetingHallClick} />
       <Trees />
@@ -553,26 +567,51 @@ const ThreeSocietyMap = () => {
                         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary ring-4 ring-primary/5">
                           <User className="w-8 h-8" />
                         </div>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Resident Owner</p>
-                          <p className="font-display text-2xl font-bold text-foreground">
-                            {selectedFlat.owner?.display_name || 'Available Flat'}
-                          </p>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Resident Owner</p>
+                            <p className="font-display text-2xl font-bold text-foreground">
+                              {selectedFlat.owner?.display_name || 'Available Flat'}
+                            </p>
+                          </div>
                         </div>
+                        {!selectedFlat.is_claimed && (
+                          <div className="flex flex-col items-end gap-2">
+                            <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                              Requirement: {selectedFlat.endorsements_required} Endorsements
+                            </span>
+                            <Button 
+                              variant="society" 
+                              size="lg" 
+                              onClick={() => handleClaimFlat(selectedFlat.id)} 
+                              disabled={!!userFlat || (profile?.endorsement_count || 0) < selectedFlat.endorsements_required}
+                              className="shadow-xl shadow-primary/20"
+                            >
+                              {claimingFlat === selectedFlat.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "Claim Residence"}
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      {!selectedFlat.is_claimed && (
-                        <Button 
-                          variant="society" 
-                          size="lg" 
-                          onClick={() => handleClaimFlat(selectedFlat.id)} 
-                          disabled={!!userFlat}
-                          className="shadow-xl shadow-primary/20"
-                        >
-                          {claimingFlat === selectedFlat.id ? <Loader2 className="w-5 h-5 animate-spin" /> : "Claim Residence"}
-                        </Button>
+                      
+                      {!selectedFlat.is_claimed && profile && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-muted-foreground">Your Endorsements</span>
+                            <span className="text-xs font-black text-foreground">{profile.endorsement_count} / {selectedFlat.endorsements_required}</span>
+                          </div>
+                          <div className="w-full h-2 bg-secondary/20 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary transition-all duration-1000" 
+                              style={{ width: `${Math.min(100, (profile.endorsement_count / selectedFlat.endorsements_required) * 100)}%` }}
+                            />
+                          </div>
+                          {profile.endorsement_count < selectedFlat.endorsements_required && (
+                            <p className="text-[10px] text-primary font-bold mt-2 animate-pulse">
+                              Invite {selectedFlat.endorsements_required - profile.endorsement_count} more friends to unlock this flat!
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
 
                   {selectedFlat.is_claimed && (
                     <>

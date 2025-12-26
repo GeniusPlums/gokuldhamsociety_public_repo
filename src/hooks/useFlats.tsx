@@ -12,6 +12,8 @@ export interface Flat {
   chaos_score: number;
   contribution_score: number;
   is_claimed: boolean;
+  tier: string;
+  endorsements_required: number;
   owner?: {
     id: string;
     display_name: string;
@@ -53,6 +55,20 @@ export const useFlats = () => {
       toast({
         title: 'Login required',
         description: 'Please login to claim a flat.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // Find the flat to check requirements
+    const flatToClaim = flats.find(f => f.id === flatId);
+    if (!flatToClaim) return false;
+
+    // Check endorsement requirement
+    if (profile.endorsement_count < flatToClaim.endorsements_required) {
+      toast({
+        title: 'Endorsements needed',
+        description: `You need ${flatToClaim.endorsements_required} endorsements to claim this flat. You currently have ${profile.endorsement_count}.`,
         variant: 'destructive',
       });
       return false;

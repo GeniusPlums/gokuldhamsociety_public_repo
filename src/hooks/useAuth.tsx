@@ -7,6 +7,9 @@ interface Profile {
   user_id: string;
   display_name: string;
   avatar_url: string | null;
+  referral_code: string;
+  endorsement_count: number;
+  referred_by: string | null;
 }
 
 interface Flat {
@@ -18,6 +21,8 @@ interface Flat {
   chaos_score: number;
   contribution_score: number;
   is_claimed: boolean;
+  tier: string;
+  endorsements_required: number;
 }
 
 interface AuthContextType {
@@ -26,7 +31,7 @@ interface AuthContextType {
   profile: Profile | null;
   flat: Flat | null;
   loading: boolean;
-  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, displayName: string, referredBy?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -49,16 +54,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .maybeSingle();
     
     if (profileData) {
-      setProfile(profileData);
+      setProfile(profileData as Profile);
       
-      // Fetch user's flat if they have one
       const { data: flatData } = await supabase
         .from('flats')
         .select('*')
         .eq('owner_id', profileData.id)
         .maybeSingle();
       
-      setFlat(flatData);
+      setFlat(flatData as Flat);
     }
   };
 
@@ -69,13 +73,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer profile fetch to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
@@ -87,7 +89,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -102,9 +103,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (email: string, password: string, displayName: string, referredBy?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
+    let referredById = null;
+    if (referredBy) {
+      const { data: referrer } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('referral_code', referredBy)
+        .maybeSingle();
+      if (referrer) referredById = referrer.id;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -112,6 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         emailRedirectTo: redirectUrl,
         data: {
           display_name: displayName,
+          referred_by: referredById
         },
       },
     });
