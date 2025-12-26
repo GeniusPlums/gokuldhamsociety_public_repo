@@ -52,15 +52,22 @@ const Header = () => {
         </Link>
 
         {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('wiki')}>
-              <BookOpen className="w-4 h-4" />
-              Wiki
-            </Button>
-            <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('notices')}>
-              <Bell className="w-4 h-4" />
-              Notices
-            </Button>
+            <nav className="hidden md:flex items-center gap-1">
+              <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('wiki')}>
+                <BookOpen className="w-4 h-4" />
+                Wiki
+              </Button>
+              <Button variant="ghost" className="gap-2" asChild>
+                <Link to="/characters" className="flex items-center gap-2">
+                  <Star className="w-4 h-4" />
+                  Characters
+                </Link>
+              </Button>
+              <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('notices')}>
+                <Bell className="w-4 h-4" />
+                Notices
+              </Button>
+
             <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('map')}>
               <Users className="w-4 h-4" />
               Residents

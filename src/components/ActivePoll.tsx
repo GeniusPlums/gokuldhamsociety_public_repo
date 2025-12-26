@@ -221,13 +221,20 @@ const ActivePoll = () => {
             </span>
           </div>
 
-          <div className="bg-card rounded-2xl p-6 md:p-8 border border-border shadow-elevated overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-4">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground rounded-full border border-border">
-                {getPollTypeIcon(activePoll.poll_type)}
-                {activePoll.poll_type}
+            <div className="bg-card rounded-2xl p-6 md:p-8 border border-border shadow-elevated overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 flex flex-col items-end gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground rounded-full border border-border">
+                  {getPollTypeIcon(activePoll.poll_type)}
+                  {activePoll.poll_type}
+                </div>
+                {activePoll.character && (
+                  <Badge className="bg-primary hover:bg-primary/90 text-[10px] py-0 px-2 gap-1 uppercase font-black">
+                    <ShieldAlert className="w-3 h-3" />
+                    Official {activePoll.character.name}
+                  </Badge>
+                )}
               </div>
-            </div>
+
 
             <h3 className="font-display text-xl md:text-2xl font-bold text-foreground mb-3 pr-16">
               {activePoll.title}

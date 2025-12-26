@@ -285,11 +285,24 @@ const NoticeBoard = () => {
                       </button>
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        {/* Tags as implemented before */}
-                      </div>
-                      <h3 className="font-display font-bold text-lg text-foreground mb-2 hover:text-primary cursor-pointer transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          {notice.character && (
+                            <Badge className="bg-primary hover:bg-primary/90 text-[10px] py-0 px-2 gap-1 uppercase font-black">
+                              <ShieldAlert className="w-3 h-3" />
+                              Official {notice.character.name}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] uppercase font-bold border-muted-foreground/20">
+                            {notice.notice_type}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <h3 className="font-display font-bold text-lg text-foreground mb-2 hover:text-primary cursor-pointer transition-colors">
+
                         {notice.title}
                       </h3>
                       <p className="text-muted-foreground text-sm mb-3">{notice.content}</p>

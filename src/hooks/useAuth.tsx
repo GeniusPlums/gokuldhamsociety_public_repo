@@ -8,9 +8,11 @@ interface Profile {
   display_name: string;
   avatar_url: string | null;
   referral_code: string;
-  endorsement_count: number;
-  referred_by: string | null;
-}
+    endorsement_count: number;
+    referred_by: string | null;
+    role: string | null;
+  }
+
 
 interface Flat {
   id: string;

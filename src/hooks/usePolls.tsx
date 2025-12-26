@@ -22,21 +22,26 @@ export interface Poll {
   description: string | null;
   poll_type: PollType;
   status: PollStatus;
-  results_hidden: boolean;
-  ends_at: string;
-  created_at: string;
-  options: PollOption[];
-  total_votes: number;
-  author?: {
-    id: string;
-    display_name: string;
-  } | null;
-  flat?: {
-    id: string;
-    building: string;
-    flat_number: string;
-  } | null;
-  user_voted?: boolean;
+    results_hidden: boolean;
+    ends_at: string;
+    created_at: string;
+    character_id: string | null;
+    options: PollOption[];
+    total_votes: number;
+    author?: {
+      id: string;
+      display_name: string;
+    } | null;
+    character?: {
+      id: string;
+      name: string;
+    } | null;
+    flat?: {
+      id: string;
+      building: string;
+      flat_number: string;
+    } | null;
+    user_voted?: boolean;
 }
 
 export const usePolls = () => {
@@ -54,6 +59,10 @@ export const usePolls = () => {
         author:profiles!polls_author_id_fkey (
           id,
           display_name
+        ),
+        character:characters!polls_character_id_fkey (
+          id,
+          name
         ),
         flat:flats!polls_flat_id_fkey (
           id,

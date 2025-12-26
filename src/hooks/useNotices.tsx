@@ -7,28 +7,33 @@ import { Database } from '@/integrations/supabase/types';
 type NoticeType = Database['public']['Enums']['notice_type'];
 
 export interface Notice {
-  id: string;
-  flat_id: string;
-  author_id: string;
-  title: string;
-  content: string;
-  notice_type: NoticeType;
-  upvotes: number;
-  downvotes: number;
-  is_pinned: boolean;
-  is_escalated: boolean;
-  escalation_reason: string | null;
-  created_at: string;
-  author?: {
     id: string;
-    display_name: string;
-  } | null;
-  flat?: {
-    id: string;
-    building: string;
-    flat_number: string;
-  } | null;
-  comment_count?: number;
+    flat_id: string;
+    author_id: string;
+    character_id: string | null;
+    title: string;
+    content: string;
+    notice_type: NoticeType;
+    upvotes: number;
+    downvotes: number;
+    is_pinned: boolean;
+    is_escalated: boolean;
+    escalation_reason: string | null;
+    created_at: string;
+    author?: {
+      id: string;
+      display_name: string;
+    } | null;
+    character?: {
+      id: string;
+      name: string;
+    } | null;
+    flat?: {
+      id: string;
+      building: string;
+      flat_number: string;
+    } | null;
+    comment_count?: number;
 }
 
 export type SortOption = 'new' | 'trending' | 'escalated' | 'committee';
@@ -49,6 +54,10 @@ export const useNotices = () => {
         author:profiles!notices_author_id_fkey (
           id,
           display_name
+        ),
+        character:characters!notices_character_id_fkey (
+          id,
+          name
         ),
         flat:flats!notices_flat_id_fkey (
           id,
