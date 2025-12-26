@@ -250,6 +250,47 @@ export const useNotices = () => {
 
   useEffect(() => {
     fetchNotices();
+
+    const channel = supabase
+      .channel('notices-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notices',
+        },
+        () => {
+          fetchNotices();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+        },
+        () => {
+          fetchNotices();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notice_votes',
+        },
+        () => {
+          fetchNotices();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sortBy]);
 
   return { notices, loading, createNotice, voteNotice, escalateNotice, sortBy, setSortBy, refetch: fetchNotices };

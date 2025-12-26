@@ -115,6 +115,36 @@ export const useFlats = () => {
 
   useEffect(() => {
     fetchFlats();
+
+    const channel = supabase
+      .channel('flats-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'flats',
+        },
+        () => {
+          fetchFlats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        () => {
+          fetchFlats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return { flats, loading, claimFlat, refetch: fetchFlats };

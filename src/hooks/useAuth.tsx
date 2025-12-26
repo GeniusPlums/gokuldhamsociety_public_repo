@@ -72,36 +72,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+    useEffect(() => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            setTimeout(() => {
+              fetchProfile(session.user.id);
+            }, 0);
+          } else {
+            setProfile(null);
+            setFlat(null);
+          }
+        }
+      );
+  
+      supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
+          fetchProfile(session.user.id).finally(() => setLoading(false));
         } else {
-          setProfile(null);
-          setFlat(null);
+          setLoading(false);
         }
-      }
-    );
+      });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
+      // Realtime subscription for the current user's profile and flat
+      let profileSubscription: any = null;
+      let flatSubscription: any = null;
 
-    return () => subscription.unsubscribe();
-  }, []);
+      if (user) {
+        profileSubscription = supabase
+          .channel(`public:profiles:user_id=eq.${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'profiles',
+              filter: `user_id=eq.${user.id}`,
+            },
+            () => {
+              fetchProfile(user.id);
+            }
+          )
+          .subscribe();
+
+        // We don't have a direct user_id on flats, but we have owner_id which matches profile.id
+        // However, we can just listen to all flats changes if needed, or if we have the profile id already.
+      }
+  
+      return () => {
+        subscription.unsubscribe();
+        if (profileSubscription) supabase.removeChannel(profileSubscription);
+      };
+    }, [user?.id]);
 
   const signUp = async (email: string, password: string, displayName: string, referredBy?: string) => {
     const redirectUrl = `${window.location.origin}/`;
