@@ -268,13 +268,13 @@ const NoticeBoard3D = ({ onClick }: any) => {
   );
 };
 
-const MeetingHall3D = ({ onClick }: any) => {
+const MeetingHall3D = ({ onClick, position, label }: any) => {
   const [hovered, setHovered] = useState(false);
   useCursor(hovered);
 
   return (
     <group 
-      position={[10, 0, -10]} 
+      position={position} 
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -307,7 +307,7 @@ const MeetingHall3D = ({ onClick }: any) => {
         anchorX="center"
         anchorY="middle"
       >
-        SOCIETY OFFICE
+        {label}
       </Text>
       
       {hovered && (
@@ -326,7 +326,7 @@ const Trees = () => (
   <group>
     {[
       [-12, 0, 12], [12, 0, 12], [-12, 0, -12], [12, 0, -12],
-      [-18, 0, 0], [18, 0, 0], [0, 0, -20]
+      [-18, 0, 0], [24, 0, 0], [0, 0, -28]
     ].map((pos, i) => (
       <group key={i} position={pos as [number, number, number]}>
         <mesh position={[0, 1, 0]} castShadow>
@@ -416,8 +416,8 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
         baseColor="#f3f4f6"
       />
       <Building 
-        position={[18, 0, 10]} 
-        rotation={[0, -Math.PI / 2, 0]}
+        position={[0, 0, -18]} 
+        rotation={[0, 0, 0]}
         wing="B" 
         flats={buildings["B"] || []} 
         onFlatClick={onFlatClick} 
@@ -428,7 +428,16 @@ const Scene = ({ flats, onFlatClick, userFlatId, onNoticeBoardClick, onMeetingHa
       {/* Environment & Landmarks */}
       <MainGate position={[0, 0, 20]} />
       <NoticeBoard3D onClick={onNoticeBoardClick} />
-      <MeetingHall3D onClick={onMeetingHallClick} />
+      <MeetingHall3D 
+        position={[18, 0, 10]} 
+        label="SOCIETY OFFICE" 
+        onClick={onMeetingHallClick} 
+      />
+      <MeetingHall3D 
+        position={[18, 0, 0]} 
+        label="CLUB HOUSE" 
+        onClick={() => {}} 
+      />
       <Trees />
 
       <ContactShadows position={[0, 0, 0]} opacity={0.3} scale={60} blur={2.5} far={10} />
