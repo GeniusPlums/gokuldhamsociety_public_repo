@@ -21,18 +21,18 @@ const Index = () => {
         <link rel="canonical" href="https://gokuldhamsociety.com" />
       </Helmet>
 
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main>
-          <HeroSection />
-          <ElectionBanner />
-          <SocietyMap />
-          <NoticeBoard />
-          <ActivePoll />
-          <ComplaintHighlights />
-        </main>
-        <Footer />
-      </div>
+        <div className="min-h-screen bg-background">
+          <Header />
+          <main>
+            <div id="hero"><HeroSection /></div>
+            <div id="elections"><ElectionBanner /></div>
+            <div id="map"><SocietyMap /></div>
+            <div id="notices"><NoticeBoard /></div>
+            <div id="polls"><ActivePoll /></div>
+            <div id="complaints"><ComplaintHighlights /></div>
+          </main>
+          <Footer />
+        </div>
     </>
   );
 };

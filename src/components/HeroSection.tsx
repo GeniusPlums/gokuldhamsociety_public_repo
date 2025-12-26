@@ -1,7 +1,34 @@
 import { ArrowRight, Home, Users, MessageSquare } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const headerOffset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }
+  };
+
+  const handleClaimClick = () => {
+    if (user) {
+      scrollToSection('map');
+    } else {
+      navigate('/auth');
+    }
+  };
+
   return (
     <section className="relative overflow-hidden py-16 md:py-24">
       {/* Background Pattern */}
@@ -29,11 +56,11 @@ const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-slide-up stagger-3 opacity-0">
-            <Button variant="society" size="xl" className="group">
+            <Button variant="society" size="xl" className="group" onClick={handleClaimClick}>
               Claim Your Flat
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button variant="outline" size="xl">
+            <Button variant="outline" size="xl" onClick={() => scrollToSection('map')}>
               Explore Society
             </Button>
           </div>

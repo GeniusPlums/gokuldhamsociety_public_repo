@@ -41,14 +41,14 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-background/50">
-            © 2025 Gokuldham Society. A fan-made community experience.
-          </p>
-          <p className="flex items-center gap-1 text-sm text-background/50">
-            Made with <Heart className="w-4 h-4 text-destructive" /> by TMKOC fans
-          </p>
-        </div>
+          <div className="pt-8 border-t border-background/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-background/50">
+              © 2025 Gokuldham Society. All rights reserved.
+            </p>
+            <p className="flex items-center gap-1 text-sm text-background/50">
+              Powered by <span className="font-bold text-primary">Astrazen</span>
+            </p>
+          </div>
       </div>
     </footer>
   );

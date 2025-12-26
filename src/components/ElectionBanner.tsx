@@ -1,7 +1,46 @@
-import { Crown, Calendar, ArrowRight } from "lucide-react";
+import { Crown, Calendar, ArrowRight, Info } from "lucide-react";
 import { Button } from "./ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
 
 const ElectionBanner = () => {
+  const { toast } = useToast();
+  const { user, flat } = useAuth();
+  const navigate = useNavigate();
+
+  const handleNominate = () => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    if (!flat) {
+      toast({
+        title: "No Flat Claimed",
+        description: "You must claim a flat before nominating yourself for the committee.",
+        variant: "destructive",
+      });
+      const mapElement = document.getElementById('map');
+      if (mapElement) {
+        mapElement.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+    
+    toast({
+      title: "Nomination Registered!",
+      description: "Your nomination for the upcoming elections has been recorded. Good luck, resident!",
+    });
+  };
+
   return (
     <section className="py-8">
       <div className="container">
@@ -36,13 +75,38 @@ const ElectionBanner = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                className="border-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground hover:text-primary bg-transparent"
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-2 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground hover:text-primary bg-transparent"
+                  >
+                    View Candidates
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Election Candidates</DialogTitle>
+                    <DialogDescription>
+                      The following residents have submitted their nominations for the upcoming elections.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="p-4 rounded-xl bg-muted border border-border flex items-start gap-3">
+                      <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">
+                        No candidates have been finalized yet. Nominations are currently in the review phase. 
+                        Check back on January 1st!
+                      </p>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <Button 
+                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 group"
+                onClick={handleNominate}
               >
-                View Candidates
-              </Button>
-              <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 group">
                 Nominate Yourself
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>

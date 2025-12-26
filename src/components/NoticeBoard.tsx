@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2, Share2, Filter, ShieldAlert } from "lucide-react";
+import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2, Share2, Filter, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNotices, Notice, SortOption } from "@/hooks/useNotices";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
+import { NoticeComments } from "./NoticeComments";
 import {
   Dialog,
   DialogContent,
@@ -65,11 +66,19 @@ const NoticeBoard = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEscalateDialogOpen, setIsEscalateDialogOpen] = useState(false);
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newType, setNewType] = useState<NoticeType>("general");
   const [escalationReason, setEscalationReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const toggleComments = (id: string) => {
+    setExpandedComments(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const handleCreateNotice = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
@@ -118,7 +127,7 @@ const NoticeBoard = () => {
 
   if (loading && notices.length === 0) {
     return (
-      <section className="py-16">
+      <section className="py-16" id="notices">
         <div className="container flex justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -127,7 +136,7 @@ const NoticeBoard = () => {
   }
 
   return (
-    <section className="py-16">
+    <section className="py-16" id="notices">
       <div className="container">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8">
           <div>
@@ -309,9 +318,13 @@ const NoticeBoard = () => {
                           <Clock className="w-3.5 h-3.5" />
                           {formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}
                         </span>
-                        <button className="flex items-center gap-1 hover:text-primary transition-colors">
+                        <button 
+                          onClick={() => toggleComments(notice.id)}
+                          className={`flex items-center gap-1 hover:text-primary transition-colors ${expandedComments[notice.id] ? 'text-primary font-bold' : ''}`}
+                        >
                           <MessageSquare className="w-3.5 h-3.5" />
                           {notice.comment_count || 0} comments
+                          {expandedComments[notice.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
                       </div>
                       
@@ -337,6 +350,13 @@ const NoticeBoard = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Comments Section */}
+                    {expandedComments[notice.id] && (
+                      <div className="animate-slide-down">
+                        <NoticeComments noticeId={notice.id} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </article>

@@ -21,6 +21,21 @@ const Header = () => {
     navigate('/');
   };
 
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const headerOffset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+    }
+    setMobileMenuOpen(false);
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full bg-card/80 backdrop-blur-md border-b border-border">
       <div className="container flex h-16 items-center justify-between">
@@ -38,15 +53,15 @@ const Header = () => {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
-          <Button variant="ghost" className="gap-2">
+          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('notices')}>
             <Bell className="w-4 h-4" />
             Notices
           </Button>
-          <Button variant="ghost" className="gap-2">
+          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('map')}>
             <Users className="w-4 h-4" />
             Residents
           </Button>
-          <Button variant="ghost" className="gap-2">
+          <Button variant="ghost" className="gap-2" onClick={() => scrollToSection('polls')}>
             <Vote className="w-4 h-4" />
             Polls
           </Button>
