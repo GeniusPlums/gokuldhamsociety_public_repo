@@ -1,68 +1,29 @@
-import { ArrowUp, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock } from "lucide-react";
+import { useState } from "react";
+import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
+import { useNotices, Notice } from "@/hooks/useNotices";
+import { useAuth } from "@/hooks/useAuth";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Database } from "@/integrations/supabase/types";
 
-type NoticeType = "general" | "emergency" | "meeting" | "complaint" | "event";
-
-interface Notice {
-  id: string;
-  type: NoticeType;
-  title: string;
-  content: string;
-  author: string;
-  flat: string;
-  upvotes: number;
-  comments: number;
-  timeAgo: string;
-  isPinned?: boolean;
-}
-
-const notices: Notice[] = [
-  {
-    id: "1",
-    type: "emergency",
-    title: "Water supply will be off tomorrow",
-    content: "Municipal corporation has informed that water supply will be disrupted from 10 AM to 4 PM for pipeline maintenance. Please store water accordingly.",
-    author: "Aatmaram Bhide",
-    flat: "A-202",
-    upvotes: 45,
-    comments: 23,
-    timeAgo: "2 hours ago",
-    isPinned: true,
-  },
-  {
-    id: "2",
-    type: "complaint",
-    title: "Loud music from A-101 after 11 PM",
-    content: "This is the third time this week. Society rules clearly state quiet hours after 10 PM. Requesting committee to take action.",
-    author: "Iyer",
-    flat: "B-101",
-    upvotes: 32,
-    comments: 56,
-    timeAgo: "4 hours ago",
-  },
-  {
-    id: "3",
-    type: "event",
-    title: "Garba Night - Save the Date!",
-    content: "Annual Navratri Garba celebration will be held on 15th October in the society compound. All residents are welcome!",
-    author: "Daya Gada",
-    flat: "A-101",
-    upvotes: 89,
-    comments: 12,
-    timeAgo: "1 day ago",
-  },
-  {
-    id: "4",
-    type: "meeting",
-    title: "Emergency Society Meeting - Parking Issue",
-    content: "All flat owners are requested to attend the meeting regarding the ongoing parking disputes. Venue: Society Hall, Time: 7 PM.",
-    author: "Secretary",
-    flat: "Committee",
-    upvotes: 28,
-    comments: 8,
-    timeAgo: "3 hours ago",
-  },
-];
+type NoticeType = Database['public']['Enums']['notice_type'];
 
 const getNoticeIcon = (type: NoticeType) => {
   switch (type) {
@@ -70,7 +31,7 @@ const getNoticeIcon = (type: NoticeType) => {
       return <AlertTriangle className="w-4 h-4" />;
     case "meeting":
       return <Megaphone className="w-4 h-4" />;
-    case "event":
+    case "festival":
       return <PartyPopper className="w-4 h-4" />;
     case "complaint":
       return <MessageSquare className="w-4 h-4" />;
@@ -85,16 +46,50 @@ const getNoticeStyles = (type: NoticeType) => {
       return "bg-destructive/10 text-destructive border-destructive/20";
     case "meeting":
       return "bg-primary/10 text-primary border-primary/20";
-    case "event":
+    case "festival":
       return "bg-accent/50 text-foreground border-accent";
     case "complaint":
       return "bg-secondary/10 text-secondary border-secondary/20";
+    case "election":
+      return "bg-primary/10 text-primary border-primary/20";
     default:
       return "bg-muted text-muted-foreground border-border";
   }
 };
 
 const NoticeBoard = () => {
+  const { notices, loading, createNotice, voteNotice } = useNotices();
+  const { user, flat } = useAuth();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [newType, setNewType] = useState<NoticeType>("general");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleCreateNotice = async () => {
+    if (!newTitle.trim() || !newContent.trim()) return;
+    
+    setSubmitting(true);
+    const success = await createNotice(newTitle, newContent, newType);
+    if (success) {
+      setNewTitle("");
+      setNewContent("");
+      setNewType("general");
+      setIsDialogOpen(false);
+    }
+    setSubmitting(false);
+  };
+
+  if (loading) {
+    return (
+      <section className="py-16">
+        <div className="container flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-16">
       <div className="container">
@@ -108,86 +103,155 @@ const NoticeBoard = () => {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="notice" size="sm">
-              Trending
-            </Button>
-            <Button variant="ghost" size="sm">
-              New
-            </Button>
-            <Button variant="ghost" size="sm">
-              Escalated
-            </Button>
+            {user && flat && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="society" size="sm" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Post Notice
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Post a Notice</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Notice Type</Label>
+                      <Select value={newType} onValueChange={(v) => setNewType(v as NoticeType)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem>
+                          <SelectItem value="emergency">Emergency</SelectItem>
+                          <SelectItem value="meeting">Meeting</SelectItem>
+                          <SelectItem value="complaint">Complaint</SelectItem>
+                          <SelectItem value="festival">Festival/Event</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input
+                        placeholder="What's this about?"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        maxLength={100}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Content</Label>
+                      <Textarea
+                        placeholder="Describe your notice..."
+                        value={newContent}
+                        onChange={(e) => setNewContent(e.target.value)}
+                        maxLength={500}
+                        rows={4}
+                      />
+                      <p className="text-xs text-muted-foreground text-right">{newContent.length}/500</p>
+                    </div>
+                    <Button
+                      variant="society"
+                      className="w-full"
+                      onClick={handleCreateNotice}
+                      disabled={submitting || !newTitle.trim() || !newContent.trim()}
+                    >
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Post Notice"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
         </div>
 
-        <div className="grid gap-4">
-          {notices.map((notice, index) => (
-            <article
-              key={notice.id}
-              className="notice-card animate-slide-up opacity-0"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              {notice.isPinned && (
-                <div className="absolute -top-2 right-4 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                  📌 Pinned
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                {/* Upvote Section */}
-                <div className="flex flex-col items-center gap-1 min-w-[50px]">
-                  <button className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-primary">
-                    <ArrowUp className="w-5 h-5" />
-                  </button>
-                  <span className="font-bold text-foreground">{notice.upvotes}</span>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${getNoticeStyles(
-                        notice.type
-                      )}`}
-                    >
-                      {getNoticeIcon(notice.type)}
-                      {notice.type.charAt(0).toUpperCase() + notice.type.slice(1)}
-                    </span>
-                    <span className="flat-badge">
-                      🏠 {notice.flat}
-                    </span>
+        {notices.length === 0 ? (
+          <div className="text-center py-12 bg-card rounded-2xl border border-border">
+            <Megaphone className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-display text-xl font-bold mb-2">No notices yet</h3>
+            <p className="text-muted-foreground mb-4">Be the first to post a notice!</p>
+            {user && flat && (
+              <Button variant="society" onClick={() => setIsDialogOpen(true)}>
+                Post First Notice
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {notices.map((notice, index) => (
+              <article
+                key={notice.id}
+                className="notice-card animate-slide-up opacity-0"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                {notice.is_pinned && (
+                  <div className="absolute -top-2 right-4 px-2 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
+                    📌 Pinned
                   </div>
+                )}
 
-                  <h3 className="font-display font-bold text-lg text-foreground mb-2 hover:text-primary cursor-pointer transition-colors">
-                    {notice.title}
-                  </h3>
-
-                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                    {notice.content}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">{notice.author}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      {notice.timeAgo}
-                    </span>
-                    <button className="flex items-center gap-1 hover:text-primary transition-colors">
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {notice.comments} comments
+                <div className="flex gap-4">
+                  {/* Upvote Section */}
+                  <div className="flex flex-col items-center gap-1 min-w-[50px]">
+                    <button
+                      className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-primary"
+                      onClick={() => voteNotice(notice.id, 'up')}
+                    >
+                      <ArrowUp className="w-5 h-5" />
+                    </button>
+                    <span className="font-bold text-foreground">{notice.upvotes - notice.downvotes}</span>
+                    <button
+                      className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-destructive"
+                      onClick={() => voteNotice(notice.id, 'down')}
+                    >
+                      <ArrowDown className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
 
-        <div className="text-center mt-8">
-          <Button variant="outline" size="lg">
-            View All Notices
-          </Button>
-        </div>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border ${getNoticeStyles(
+                          notice.notice_type
+                        )}`}
+                      >
+                        {getNoticeIcon(notice.notice_type)}
+                        {notice.notice_type.charAt(0).toUpperCase() + notice.notice_type.slice(1)}
+                      </span>
+                      {notice.flat && (
+                        <span className="flat-badge">
+                          🏠 {notice.flat.building}-{notice.flat.flat_number}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="font-display font-bold text-lg text-foreground mb-2 hover:text-primary cursor-pointer transition-colors">
+                      {notice.title}
+                    </h3>
+
+                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                      {notice.content}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{notice.author?.display_name}</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}
+                      </span>
+                      <button className="flex items-center gap-1 hover:text-primary transition-colors">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {notice.comment_count || 0} comments
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
