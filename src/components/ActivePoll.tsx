@@ -1,41 +1,159 @@
 import { useState } from "react";
-import { Vote, Clock, Users, CheckCircle2 } from "lucide-react";
+import { Vote, Clock, Users, CheckCircle2, Loader2, Plus } from "lucide-react";
 import { Button } from "./ui/button";
-
-interface PollOption {
-  id: string;
-  label: string;
-  votes: number;
-}
-
-const pollData = {
-  id: "poll-1",
-  title: "Should we allow pets in the society compound?",
-  description: "A complaint has been escalated regarding pets in common areas. Cast your vote to decide the society's stance.",
-  options: [
-    { id: "1", label: "Yes, with proper leash and cleaning rules", votes: 67 },
-    { id: "2", label: "Only small pets, no large dogs", votes: 45 },
-    { id: "3", label: "No pets in common areas", votes: 38 },
-    { id: "4", label: "Need more discussion first", votes: 22 },
-  ],
-  totalVotes: 172,
-  endsIn: "2 days, 14 hours",
-  isActive: true,
-};
+import { usePolls } from "@/hooks/usePolls";
+import { useAuth } from "@/hooks/useAuth";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Label } from "./ui/label";
 
 const ActivePoll = () => {
+  const { activePoll, loading, vote, createPoll } = usePolls();
+  const { user, flat } = useAuth();
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [hasVoted, setHasVoted] = useState(false);
+  const [voting, setVoting] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newOptions, setNewOptions] = useState(["", "", ""]);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleVote = () => {
-    if (selectedOption) {
-      setHasVoted(true);
+  const handleVote = async () => {
+    if (!selectedOption || !activePoll) return;
+    
+    setVoting(true);
+    await vote(activePoll.id, selectedOption);
+    setVoting(false);
+  };
+
+  const handleCreatePoll = async () => {
+    const validOptions = newOptions.filter(o => o.trim());
+    if (!newTitle.trim() || validOptions.length < 2) return;
+    
+    setSubmitting(true);
+    const endsAt = new Date();
+    endsAt.setDate(endsAt.getDate() + 3); // 3 days from now
+    
+    const success = await createPoll(newTitle, newDescription, 'opinion', validOptions, endsAt);
+    if (success) {
+      setNewTitle("");
+      setNewDescription("");
+      setNewOptions(["", "", ""]);
+      setIsDialogOpen(false);
     }
+    setSubmitting(false);
   };
 
   const getPercentage = (votes: number) => {
-    return Math.round((votes / pollData.totalVotes) * 100);
+    if (!activePoll || activePoll.total_votes === 0) return 0;
+    return Math.round((votes / activePoll.total_votes) * 100);
   };
+
+  if (loading) {
+    return (
+      <section className="py-16 bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+        <div className="container flex justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!activePoll) {
+    return (
+      <section className="py-16 bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+        <div className="container">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary inline-block mb-4">
+              <Vote className="w-8 h-8" />
+            </div>
+            <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-4">
+              No Active Polls
+            </h2>
+            <p className="text-muted-foreground mb-6">
+              There are no active polls right now. Start a conversation by creating one!
+            </p>
+            {user && flat && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="society" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Create Poll
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create a Poll</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Question</Label>
+                      <Input
+                        placeholder="What do you want to ask?"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description (optional)</Label>
+                      <Textarea
+                        placeholder="Add context..."
+                        value={newDescription}
+                        onChange={(e) => setNewDescription(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Options (min 2)</Label>
+                      {newOptions.map((opt, i) => (
+                        <Input
+                          key={i}
+                          placeholder={`Option ${i + 1}`}
+                          value={opt}
+                          onChange={(e) => {
+                            const updated = [...newOptions];
+                            updated[i] = e.target.value;
+                            setNewOptions(updated);
+                          }}
+                        />
+                      ))}
+                      {newOptions.length < 5 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNewOptions([...newOptions, ""])}
+                        >
+                          + Add Option
+                        </Button>
+                      )}
+                    </div>
+                    <Button
+                      variant="society"
+                      className="w-full"
+                      onClick={handleCreatePoll}
+                      disabled={submitting || !newTitle.trim() || newOptions.filter(o => o.trim()).length < 2}
+                    >
+                      {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Poll"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const hasVoted = activePoll.user_voted;
 
   return (
     <section className="py-16 bg-gradient-to-br from-primary/5 via-background to-secondary/5">
@@ -56,17 +174,19 @@ const ActivePoll = () => {
 
           <div className="bg-card rounded-2xl p-6 md:p-8 border border-border shadow-elevated">
             <h3 className="font-display text-xl md:text-2xl font-bold text-foreground mb-3">
-              {pollData.title}
+              {activePoll.title}
             </h3>
-            <p className="text-muted-foreground mb-6">
-              {pollData.description}
-            </p>
+            {activePoll.description && (
+              <p className="text-muted-foreground mb-6">
+                {activePoll.description}
+              </p>
+            )}
 
             <div className="space-y-3 mb-6">
-              {pollData.options.map((option) => (
+              {activePoll.options.map((option) => (
                 <div
                   key={option.id}
-                  onClick={() => !hasVoted && setSelectedOption(option.id)}
+                  onClick={() => !hasVoted && !voting && setSelectedOption(option.id)}
                   className={`poll-option ${
                     selectedOption === option.id ? "selected" : ""
                   } ${hasVoted ? "cursor-default" : ""}`}
@@ -78,7 +198,7 @@ const ActivePoll = () => {
                         style={{ width: `${getPercentage(option.votes)}%` }}
                       />
                       <div className="relative flex items-center justify-between w-full">
-                        <span className="font-medium">{option.label}</span>
+                        <span className="font-medium">{option.option_text}</span>
                         <span className="font-bold text-primary">
                           {getPercentage(option.votes)}%
                         </span>
@@ -97,7 +217,7 @@ const ActivePoll = () => {
                           <CheckCircle2 className="w-4 h-4 text-primary-foreground" />
                         )}
                       </div>
-                      <span className="font-medium">{option.label}</span>
+                      <span className="font-medium">{option.option_text}</span>
                     </>
                   )}
                 </div>
@@ -108,11 +228,11 @@ const ActivePoll = () => {
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Users className="w-4 h-4" />
-                  {pollData.totalVotes} votes
+                  {activePoll.total_votes} votes
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
-                  Ends in {pollData.endsIn}
+                  Ends {formatDistanceToNow(new Date(activePoll.ends_at), { addSuffix: true })}
                 </span>
               </div>
 
@@ -120,9 +240,9 @@ const ActivePoll = () => {
                 <Button
                   variant="society"
                   onClick={handleVote}
-                  disabled={!selectedOption}
+                  disabled={!selectedOption || voting || !user || !flat}
                 >
-                  Cast Your Vote
+                  {voting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cast Your Vote"}
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 text-secondary font-medium">
