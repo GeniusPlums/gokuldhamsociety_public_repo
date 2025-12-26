@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2, Share2, Filter, ShieldAlert, ChevronDown, ChevronUp, History, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useNotices, Notice, SortOption } from "@/hooks/useNotices";
 import { useContributions } from "@/hooks/useContributions";
 import { useAuth } from "@/hooks/useAuth";
@@ -345,11 +346,6 @@ const NoticeBoard = () => {
             </div>
           </div>
         )}
-      </div>
-    </section>
-  );
-};
-
         {/* Escalation Dialog */}
         <Dialog open={isEscalateDialogOpen} onOpenChange={setIsEscalateDialogOpen}>
           <DialogContent>
