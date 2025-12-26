@@ -16,6 +16,8 @@ export interface Notice {
   upvotes: number;
   downvotes: number;
   is_pinned: boolean;
+  is_escalated: boolean;
+  escalation_reason: string | null;
   created_at: string;
   author?: {
     id: string;
@@ -29,14 +31,18 @@ export interface Notice {
   comment_count?: number;
 }
 
+export type SortOption = 'new' | 'trending' | 'escalated' | 'committee';
+
 export const useNotices = () => {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<SortOption>('new');
   const { profile, flat } = useAuth();
   const { toast } = useToast();
 
   const fetchNotices = async () => {
-    const { data, error } = await supabase
+    setLoading(true);
+    let query = supabase
       .from('notices')
       .select(`
         *,
@@ -49,10 +55,21 @@ export const useNotices = () => {
           building,
           flat_number
         )
-      `)
-      .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(20);
+      `);
+
+    // Apply sorting
+    if (sortBy === 'new') {
+      query = query.order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
+    } else if (sortBy === 'trending') {
+      // Simple trending logic: upvotes - downvotes
+      query = query.order('upvotes', { ascending: false });
+    } else if (sortBy === 'escalated') {
+      query = query.eq('is_escalated', true).order('created_at', { ascending: false });
+    } else if (sortBy === 'committee') {
+      query = query.in('notice_type', ['meeting', 'election']).order('created_at', { ascending: false });
+    }
+
+    const { data, error } = await query.limit(20);
 
     if (error) {
       console.error('Error fetching notices:', error);
@@ -78,9 +95,9 @@ export const useNotices = () => {
         comment_count: commentCounts[notice.id] || 0,
       }));
 
-      setNotices(noticesWithCounts);
+      setNotices(noticesWithCounts as Notice[]);
     } else {
-      setNotices(data || []);
+      setNotices((data || []) as Notice[]);
     }
 
     setLoading(false);
@@ -118,6 +135,35 @@ export const useNotices = () => {
     toast({
       title: 'Notice posted!',
       description: 'Your notice is now visible to all residents.',
+    });
+
+    await fetchNotices();
+    return true;
+  };
+
+  const escalateNotice = async (noticeId: string, reason: string) => {
+    if (!profile || !flat) return false;
+
+    const { error } = await supabase
+      .from('notices')
+      .update({
+        is_escalated: true,
+        escalation_reason: reason
+      })
+      .eq('id', noticeId);
+
+    if (error) {
+      toast({
+        title: 'Failed to escalate',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    toast({
+      title: 'Notice escalated!',
+      description: 'The committee has been notified.',
     });
 
     await fetchNotices();
@@ -204,7 +250,7 @@ export const useNotices = () => {
 
   useEffect(() => {
     fetchNotices();
-  }, []);
+  }, [sortBy]);
 
-  return { notices, loading, createNotice, voteNotice, refetch: fetchNotices };
+  return { notices, loading, createNotice, voteNotice, escalateNotice, sortBy, setSortBy, refetch: fetchNotices };
 };

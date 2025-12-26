@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Vote, Clock, Users, CheckCircle2, Loader2, Plus } from "lucide-react";
+import { Vote, Clock, Users, CheckCircle2, Loader2, Plus, Lock, Info, Gavel, Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import { usePolls } from "@/hooks/usePolls";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,6 +14,30 @@ import {
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Database } from "@/integrations/supabase/types";
+
+type PollType = Database['public']['Enums']['poll_type'];
+
+const getPollTypeIcon = (type: PollType) => {
+  switch (type) {
+    case 'verdict':
+      return <Gavel className="w-4 h-4" />;
+    case 'punishment':
+      return <Lock className="w-4 h-4" />;
+    case 'election':
+      return <Users className="w-4 h-4" />;
+    default:
+      return <Vote className="w-4 h-4" />;
+  }
+};
 
 const ActivePoll = () => {
   const { activePoll, loading, vote, createPoll } = usePolls();
@@ -23,7 +47,9 @@ const ActivePoll = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newType, setNewType] = useState<PollType>("opinion");
   const [newOptions, setNewOptions] = useState(["", "", ""]);
+  const [resultsHidden, setResultsHidden] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const handleVote = async () => {
@@ -42,11 +68,12 @@ const ActivePoll = () => {
     const endsAt = new Date();
     endsAt.setDate(endsAt.getDate() + 3); // 3 days from now
     
-    const success = await createPoll(newTitle, newDescription, 'opinion', validOptions, endsAt);
+    const success = await createPoll(newTitle, newDescription, newType, validOptions, endsAt, resultsHidden);
     if (success) {
       setNewTitle("");
       setNewDescription("");
       setNewOptions(["", "", ""]);
+      setNewType("opinion");
       setIsDialogOpen(false);
     }
     setSubmitting(false);
@@ -94,6 +121,28 @@ const ActivePoll = () => {
                     <DialogTitle>Create a Poll</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Poll Type</Label>
+                        <Select value={newType} onValueChange={(v) => setNewType(v as PollType)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="opinion">Opinion</SelectItem>
+                            <SelectItem value="verdict">Verdict</SelectItem>
+                            <SelectItem value="punishment">Punishment</SelectItem>
+                            <SelectItem value="election">Election</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex flex-col justify-end space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Switch id="hidden" checked={resultsHidden} onCheckedChange={setResultsHidden} />
+                          <Label htmlFor="hidden" className="text-xs">Hide Results until vote</Label>
+                        </div>
+                      </div>
+                    </div>
                     <div className="space-y-2">
                       <Label>Question</Label>
                       <Input
@@ -172,14 +221,28 @@ const ActivePoll = () => {
             </span>
           </div>
 
-          <div className="bg-card rounded-2xl p-6 md:p-8 border border-border shadow-elevated">
-            <h3 className="font-display text-xl md:text-2xl font-bold text-foreground mb-3">
+          <div className="bg-card rounded-2xl p-6 md:p-8 border border-border shadow-elevated overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-4">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-muted text-muted-foreground rounded-full border border-border">
+                {getPollTypeIcon(activePoll.poll_type)}
+                {activePoll.poll_type}
+              </div>
+            </div>
+
+            <h3 className="font-display text-xl md:text-2xl font-bold text-foreground mb-3 pr-16">
               {activePoll.title}
             </h3>
             {activePoll.description && (
               <p className="text-muted-foreground mb-6">
                 {activePoll.description}
               </p>
+            )}
+
+            {activePoll.results_hidden && !hasVoted && (
+              <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10 flex items-center gap-2 text-xs text-primary font-medium">
+                <Lock className="w-3.5 h-3.5" />
+                Results are hidden until you cast your vote.
+              </div>
             )}
 
             <div className="space-y-3 mb-6">
@@ -225,15 +288,21 @@ const ActivePoll = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-border">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Users className="w-4 h-4" />
-                  {activePoll.total_votes} votes
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" />
-                  Ends {formatDistanceToNow(new Date(activePoll.ends_at), { addSuffix: true })}
-                </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4" />
+                    {activePoll.total_votes} votes
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4" />
+                    Ends {formatDistanceToNow(new Date(activePoll.ends_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic">
+                  <Sparkles className="w-3 h-3" />
+                  Voting weight affected by your Flat Reputation
+                </div>
               </div>
 
               {!hasVoted ? (

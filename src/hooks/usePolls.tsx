@@ -22,6 +22,7 @@ export interface Poll {
   description: string | null;
   poll_type: PollType;
   status: PollStatus;
+  results_hidden: boolean;
   ends_at: string;
   created_at: string;
   options: PollOption[];
@@ -96,11 +97,11 @@ export const usePolls = () => {
       };
     });
 
-    setPolls(pollsWithOptions);
+    setPolls(pollsWithOptions as Poll[]);
     
     // Set active poll (first active one)
     const active = pollsWithOptions.find(p => p.status === 'active' && new Date(p.ends_at) > new Date());
-    setActivePoll(active || null);
+    setActivePoll(active as Poll || null);
     
     setLoading(false);
   };
@@ -110,7 +111,8 @@ export const usePolls = () => {
     description: string,
     pollType: PollType,
     options: string[],
-    endsAt: Date
+    endsAt: Date,
+    resultsHidden: boolean = true
   ) => {
     if (!profile || !flat) {
       toast({
@@ -130,6 +132,7 @@ export const usePolls = () => {
         description,
         poll_type: pollType,
         ends_at: endsAt.toISOString(),
+        results_hidden: resultsHidden,
       })
       .select()
       .single();

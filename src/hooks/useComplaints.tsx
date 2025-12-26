@@ -19,6 +19,7 @@ export interface Complaint {
   agrees: number;
   disagrees: number;
   mocks: number;
+  escalated_to_poll_id: string | null;
   created_at: string;
   author?: {
     id: string;
@@ -77,7 +78,7 @@ export const useComplaints = () => {
       return;
     }
 
-    setComplaints(data || []);
+    setComplaints(data as Complaint[] || []);
     setLoading(false);
   };
 
@@ -159,7 +160,7 @@ export const useComplaints = () => {
         const field = reactionType === 'agree' ? 'agrees' : reactionType === 'disagree' ? 'disagrees' : 'mocks';
         await supabase
           .from('complaints')
-          .update({ [field]: Math.max(0, complaint[field] - 1) })
+          .update({ [field]: Math.max(0, (complaint[field as keyof Complaint] as number) - 1) })
           .eq('id', complaintId);
       } else {
         // Change reaction
@@ -174,8 +175,8 @@ export const useComplaints = () => {
         await supabase
           .from('complaints')
           .update({
-            [oldField]: Math.max(0, complaint[oldField as keyof typeof complaint] as number - 1),
-            [newField]: (complaint[newField as keyof typeof complaint] as number) + 1,
+            [oldField]: Math.max(0, (complaint[oldField as keyof Complaint] as number) - 1),
+            [newField]: (complaint[newField as keyof Complaint] as number) + 1,
           })
           .eq('id', complaintId);
       }
@@ -192,16 +193,73 @@ export const useComplaints = () => {
       const field = reactionType === 'agree' ? 'agrees' : reactionType === 'disagree' ? 'disagrees' : 'mocks';
       await supabase
         .from('complaints')
-        .update({ [field]: complaint[field] + 1 })
+        .update({ [field]: (complaint[field as keyof Complaint] as number) + 1 })
         .eq('id', complaintId);
     }
 
     await fetchComplaints();
   };
 
+  const escalateToPoll = async (complaintId: string, pollTitle: string) => {
+    if (!profile || !flat) return false;
+
+    const complaint = complaints.find(c => c.id === complaintId);
+    if (!complaint) return false;
+
+    // 1. Create the poll
+    const endsAt = new Date();
+    endsAt.setDate(endsAt.getDate() + 3);
+
+    const { data: pollData, error: pollError } = await supabase
+      .from('polls')
+      .insert({
+        flat_id: flat.id,
+        author_id: profile.id,
+        title: pollTitle,
+        description: `Escalated from complaint: ${complaint.title}`,
+        poll_type: 'verdict',
+        ends_at: endsAt.toISOString(),
+      })
+      .select()
+      .single();
+
+    if (pollError) {
+      toast({
+        title: 'Failed to escalate',
+        description: pollError.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // 2. Add options
+    await supabase.from('poll_options').insert([
+      { poll_id: pollData.id, option_text: 'Guilty' },
+      { poll_id: pollData.id, option_text: 'Not Guilty' },
+      { poll_id: pollData.id, option_text: 'Warning Only' }
+    ]);
+
+    // 3. Link complaint to poll
+    await supabase
+      .from('complaints')
+      .update({
+        status: 'under_review',
+        escalated_to_poll_id: pollData.id
+      })
+      .eq('id', complaintId);
+
+    toast({
+      title: 'Complaint escalated!',
+      description: 'A society poll has been created to resolve this.',
+    });
+
+    await fetchComplaints();
+    return true;
+  };
+
   useEffect(() => {
     fetchComplaints();
   }, []);
 
-  return { complaints, loading, createComplaint, reactToComplaint, refetch: fetchComplaints };
+  return { complaints, loading, createComplaint, reactToComplaint, escalateToPoll, refetch: fetchComplaints };
 };
