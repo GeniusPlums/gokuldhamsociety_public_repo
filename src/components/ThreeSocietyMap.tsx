@@ -451,7 +451,14 @@ const ThreeSocietyMap = () => {
   const { user, flat: userFlat } = useAuth();
   const [selectedFlat, setSelectedFlat] = useState<any | null>(null);
   const [claimingFlat, setClaimingFlat] = useState<string | null>(null);
+  const [isLowEnd, setIsLowEnd] = useState(() => localStorage.getItem("lowEndMode") === "true");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleLowEndChange = (e: any) => setIsLowEnd(e.detail);
+    window.addEventListener("lowEndModeChange", handleLowEndChange);
+    return () => window.removeEventListener("lowEndModeChange", handleLowEndChange);
+  }, []);
 
   const handleClaimFlat = async (flatId: string) => {
     if (!user) {

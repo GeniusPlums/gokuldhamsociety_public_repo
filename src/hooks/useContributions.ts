@@ -96,10 +96,30 @@ export const useContributions = () => {
     return data;
   };
 
+  const getRecentApproved = async (days = 7) => {
+    const dateLimit = new Date();
+    dateLimit.setDate(dateLimit.getDate() - days);
+
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('*, profiles(display_name)')
+      .eq('status', 'published')
+      .gt('created_at', dateLimit.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.error('Error fetching recent approved contributions:', error);
+      return [];
+    }
+    return data;
+  };
+
   return {
     submitContribution,
     submitReview,
     getPendingContributions,
+    getRecentApproved,
     loading
   };
 };
