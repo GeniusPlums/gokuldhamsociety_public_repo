@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2, Share2, Filter, ShieldAlert, ChevronDown, ChevronUp, History, Sparkles } from "lucide-react";
+import { ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Megaphone, PartyPopper, Clock, Plus, Loader2, Share2, Filter, ShieldAlert, ChevronDown, ChevronUp, History, Sparkles, Info, Quote } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { useNotices, Notice, SortOption } from "@/hooks/useNotices";
+import { useSuvichaar } from "@/hooks/useSuvichaar";
 import { useContributions } from "@/hooks/useContributions";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
@@ -32,6 +33,7 @@ type NoticeType = Database['public']['Enums']['notice_type'];
 
 const NoticeBoard = () => {
   const { notices, loading, createNotice, voteNotice, escalateNotice, sortBy, setSortBy } = useNotices();
+  const { data: suvichaar, isLoading: loadingSuvichaar } = useSuvichaar();
   const { getRecentApproved } = useContributions();
   const { user, flat } = useAuth();
   const { toast } = useToast();
@@ -153,9 +155,20 @@ const NoticeBoard = () => {
                 : `${recentActivity.length} new community-verified additions this week`}
             </p>
           </div>
-          
+
           {activeTab === 'notices' && (
             <div className="flex flex-wrap items-center gap-3">
+              {/* Suvichaar of the Day - Compact for mobile */}
+              {!loadingSuvichaar && suvichaar && (
+                <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/10 rounded-xl max-w-md animate-fade-in">
+                  <Quote className="w-4 h-4 text-primary shrink-0" />
+                  <div className="text-xs italic text-muted-foreground overflow-hidden">
+                    <p className="truncate">"{suvichaar.content}"</p>
+                    <p className="text-[10px] font-bold text-primary text-right">— {suvichaar.author}</p>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center gap-1 bg-muted p-1 rounded-lg border border-border">
                 {(['new', 'trending', 'escalated', 'committee'] as SortOption[]).map((option) => (
                   <button
