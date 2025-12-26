@@ -46,7 +46,7 @@ const Footer = () => {
               © 2025 Gokuldham Society. All rights reserved.
             </p>
             <p className="flex items-center gap-1 text-sm text-background/50">
-              Powered by <span className="font-bold text-primary">Astrazen</span>
+              Powered by <a href="https://astrazen.co" target="_blank" rel="noopener noreferrer" className="font-bold text-primary hover:underline transition-all">Astrazen</a>
             </p>
           </div>
       </div>
